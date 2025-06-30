@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Отзывы о музыке</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- Подключение Font Awesome -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
+</head>
+<body>
+  <!-- 🔐 Авторизация -->
+  <div class="auth-container">
+    <div class="auth-form" id="register-form">
+      <h2>Регистрация</h2>
+      <input type="email" id="register-email" placeholder="Email" required />
+      <input type="password" id="register-password" placeholder="Пароль" required />
+      <button id="register-btn">Зарегистрироваться</button>
+      <p>Уже есть аккаунт? <a href="#" id="switch-to-login">Войти</a></p>
+    </div>
+
+    <div class="auth-form" id="login-form" style="display: none;">
+      <h2>Вход</h2>
+      <input type="email" id="login-email" placeholder="Email" required />
+      <input type="password" id="login-password" placeholder="Пароль" required />
+      <button id="login-btn">Войти</button>
+      <p>Нет аккаунта? <a href="#" id="switch-to-register">Регистрация</a></p>
+    </div>
+  </div>
+
+  <!-- 📝 Основное содержимое отображается после входа -->
+  <div class="container" id="main-content" style="display: none;">
+    <h1><i class="fa-solid fa-music"></i> Отзывы о музыке</h1>
+
+    <form class="review-form">
+      <label>
+        Название альбома:
+        <input type="text" name="title" id="albumInput" autocomplete="off" required />
+        <div id="suggestions" class="suggestions-box"></div>
+      </label>
+
+      <label>
+        Количество песен:
+        <input type="number" name="trackCount" min="1" required />
+      </label>
+
+      <label>
+        Год выпуска:
+        <input type="number" name="year" min="1900" max="2100" required />
+      </label>
+
+      <label>
+        Автор:
+        <input type="text" name="author" required />
+      </label>
+
+      <label>
+        Оценка (от 1 до 10):
+        <input type="number" name="rating" min="1" max="10" required />
+      </label>
+
+      <label>
+        Комментарий:
+        <textarea name="comment" rows="4" required></textarea>
+      </label>
+
+      <div id="trackListContainer">
+        <strong><i class="fa-solid fa-list-music"></i> Список композиций:</strong>
+        <div id="track-list" class="track-list"></div>
+      </div>
+
+      <button type="submit"><i class="fa-solid fa-floppy-disk"></i> Сохранить отзыв</button>
+    </form>
+
+    <h2><i class="fa-solid fa-clipboard-list"></i> Мои отзывы</h2>
+    <div id="reviews-list"></div>
+
+    <button id="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Выйти</button>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
+  <script type="module" src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"></script>
+
+  <!-- Скрипт приложения -->
+  <script type="module" src="script.js"></script>
+</body>
+</html>
