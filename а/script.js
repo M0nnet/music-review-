@@ -55,12 +55,28 @@ const saveProfileBtn = document.getElementById("save-profile");
 const displayNameInput = document.getElementById("display-name");
 const photoFileInput = document.getElementById("photo-file");
 const profileInfo = document.getElementById("profile-info");
+const photoPreview = document.getElementById("profile-photo-preview");
 const userDisplay = document.getElementById("user-display");
 const userHeader = document.getElementById("user-header");
 const userNameDisplay = document.getElementById("user-name");
 const userAvatar = document.getElementById("user-avatar");
+let photoUrlInput = { value: "" }
+const fileInput = document.getElementById("photo-file");
 const closeProfileBtn = document.getElementById("close-profile");
 
+if (fileInput) {
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        photoPreview.src = e.target.result;
+        photoPreview.style.display = "block";
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+}
 if (switchToLogin) switchToLogin.onclick = () => {
   loginForm.style.display = "block";
   registerForm.style.display = "none";
@@ -98,8 +114,41 @@ if (logoutBtn) logoutBtn.onclick = async () => {
     alert("Ошибка выхода: " + e.message);
   }
 };
+
 onAuthStateChanged(auth, (user) => {
+  async function loadUsers() {
+  const usersContainer = document.getElementById("users-list"); // если хочешь отобразить где-то
+  if (!usersContainer) return;
+
+  try {
+    const snapshot = await getDocs(collection(db, "users"));
+    usersContainer.innerHTML = "";
+    snapshot.forEach(doc => {
+      const user = doc.data();
+      const userDiv = document.createElement("div");
+      userDiv.className = "user-card";
+      userDiv.innerHTML = `
+        <img src="${user.photoURL || 'https://via.placeholder.com/40'}" style="width: 40px; border-radius: 50%;">
+        <span>${user.displayName || 'Без имени'}</span>
+        <button onclick="showUserProfile('${user.uid}', '${user.displayName || "Профиль"}', '${user.photoURL || ""}')">Посмотреть профиль</button>
+      `;
+      usersContainer.appendChild(userDiv);
+    });
+  } catch (error) {
+    console.error("Ошибка при загрузке пользователей:", error);
+  }
+}
+  async function syncUserProfile(user) {
+  if (!user) return;
+  const userDocRef = doc(db, "users", user.uid);
+  await setDoc(userDocRef, {
+    uid: user.uid,
+    displayName: user.displayName || "Без имени",
+    photoURL: user.photoURL || "",
+  }, { merge: true });
+}
   if (user) {
+    syncUserProfile(user);
     loginForm.style.display = "none";
     registerForm.style.display = "none";
     mainContent.style.display = "block";
@@ -115,6 +164,8 @@ onAuthStateChanged(auth, (user) => {
     
 
     loadReviews();
+    loadUsers();
+    updateProfileInfo();
   } else {
     loginForm.style.display = "block";
     registerForm.style.display = "none";
@@ -124,43 +175,76 @@ onAuthStateChanged(auth, (user) => {
   }
 });
 
-userHeader.onclick = () => {
-  profileSection.style.display = "block";
-};
-
-closeProfileBtn.onclick = () => {
-  profileSection.style.display = "none";
-};
-
 if (saveProfileBtn) {
- saveProfileBtn.onclick = async () => {
-  const user = auth.currentUser;
-  if (!user) return;
+  saveProfileBtn.onclick = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-  const newName = displayNameInput.value.trim();
-  const file = photoFileInput.files[0];
-  let newPhotoURL = user.photoURL || "";
+    const newName = displayNameInput.value.trim();
+let finalPhotoURL = user.photoURL || "";
 
-  try {
-    if (file) {
-      const fileRef = storageRef(storage, `avatars/${user.uid}/${file.name}`);
-      await uploadBytes(fileRef, file);
-      newPhotoURL = await getDownloadURL(fileRef);
+const file = fileInput?.files[0];
+if (file) {
+  const storagePath = `avatars/${user.uid}/${file.name}`;
+  const imageRef = storageRef(storage, storagePath);
+  await uploadBytes(imageRef, file);
+  finalPhotoURL = await getDownloadURL(imageRef);
+}
+
+    try {
+      await updateProfile(user, {
+        displayName: newName,
+        photoURL: finalPhotoURL
+      });
+
+      alert("Профиль обновлён!");
+
+      userAvatar.src = finalPhotoURL || "https://via.placeholder.com/40";
+      userNameDisplay.textContent = newName || "Профиль";
+      photoPreview.src = finalPhotoURL;
+      photoPreview.style.display = "block";
+      photoUrlInput.value = finalPhotoURL;
+
+    } catch (error) {
+      alert("Ошибка при обновлении профиля: " + error.message);
     }
+  };
+}
 
-    await updateProfile(user, {
-      displayName: newName,
-      photoURL: newPhotoURL
-    });
 
-    alert("Профиль обновлён!");
 
-    userAvatar.src = newPhotoURL || "https://via.placeholder.com/40";
-    userNameDisplay.textContent = newName || "Профиль";
-  } catch (error) {
-    alert("Ошибка при обновлении профиля: " + error.message);
-  }
+window.showUserProfile = function(uid, name, photo) {
+  alert(`Профиль пользователя: ${name}`);
 };
+async function showUserProfile(userId, userName, photoURL) {
+  const container = document.getElementById("public-profile");
+  container.innerHTML = `<h2>Профиль: ${userName}</h2>
+    <img src="${photoURL || 'https://via.placeholder.com/80'}" style="width: 80px; border-radius: 50%; margin-bottom: 10px;">
+    <div id="user-reviews"></div>`;
+  container.style.display = "block";
+
+  const reviewsSnapshot = await getDocs(collection(db, "reviews"));
+  const userReviews = reviewsSnapshot.docs
+    .map(doc => doc.data())
+    .filter(r => r.userId === userId);
+
+  const reviewsDiv = container.querySelector("#user-reviews");
+  reviewsDiv.innerHTML = "";
+
+  userReviews.forEach(review => {
+    const reviewDiv = document.createElement("div");
+    reviewDiv.className = "review";
+    reviewDiv.innerHTML = `
+      <strong>${review.title}</strong> (${review.year})<br>
+      Автор: ${review.author}<br>
+      Песен: ${review.trackCount} | Оценка: ${review.rating}/10<br>
+      <div class="comment-text">${review.comment}</div>
+    `;
+    reviewsDiv.appendChild(reviewDiv);
+  });
+
+  // Скрываем личный профиль и форму
+  document.getElementById("profile-section").style.display = "none";
 }
 
 let albumTracks = [];
@@ -232,6 +316,7 @@ function loadReviews() {
         const id = e.target.dataset.id;
         await deleteDoc(doc(db, "reviews", id));
         loadReviews();
+        loadUsers();
       })
     );
 
@@ -273,6 +358,41 @@ function loadReviews() {
   });
 }
 
+async function updateProfileInfo() {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const reviewCountEl = document.getElementById("review-count");
+  const likedTracksCountEl = document.getElementById("liked-tracks-count");
+  const recentReviewsList = document.getElementById("recent-reviews-list");
+  const likedTracksList = document.getElementById("liked-tracks-list");
+
+  try {
+    const snapshot = await getDocs(collection(db, "reviews"));
+    const userReviews = snapshot.docs
+      .map(doc => doc.data())
+      .filter(r => r.userId === user.uid);
+
+    // Отзывы
+    reviewCountEl.textContent = userReviews.length;
+
+    // Любимые треки (уникальные)
+    const likedTracks = new Set();
+    userReviews.forEach(r => {
+      (r.likedTracks || []).forEach(t => likedTracks.add(t));
+    });
+    likedTracksCountEl.textContent = likedTracks.size;
+
+    // Последние 3 отзыва
+    const latest = userReviews.slice(-3).reverse();
+    recentReviewsList.innerHTML = latest.map(r => `<li>${r.title} (${r.year})</li>`).join("") || "<li>Нет отзывов</li>";
+
+    // Любимые треки (до 5)
+    likedTracksList.innerHTML = [...likedTracks].slice(0, 5).map(t => `<li>${t}</li>`).join("") || "<li>Нет любимых треков</li>";
+  } catch (error) {
+    console.error("Ошибка при обновлении профиля:", error);
+  }
+}
 function renderTrackList() {
   const container = document.getElementById("track-list");
   if (!container) return;
@@ -297,6 +417,29 @@ function renderTrackList() {
     });
   });
 }
+
+// Открытие/закрытие профиля
+userHeader.addEventListener("click", (e) => {
+  e.stopPropagation();
+  profileSection.style.display = profileSection.style.display === "block" ? "none" : "block";
+});
+
+// Клик вне профиля — закрытие
+document.addEventListener("click", (e) => {
+  const target = e.target;
+  if (!target.closest("#profile-section") && !target.closest("#user-header")) {
+    profileSection.style.display = "none";
+  }
+});
+closeProfileBtn.onclick = () => {
+  profileSection.style.display = "none";
+};
+
+// Предотврати всплытие при кликах внутри профиля
+profileSection.addEventListener("click", (e) => {
+  e.stopPropagation();
+});
+
 document.addEventListener("DOMContentLoaded", () => {
   const form = document.querySelector(".review-form");
   const reviewsList = document.getElementById("reviews-list");
@@ -304,13 +447,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const suggestionsBox = document.getElementById("suggestions");
 
   let editIndex = null;
-
+  
   function handleDelete(e) {
     const index = e.target.dataset.index;
     const reviews = JSON.parse(localStorage.getItem("reviews")) || [];
     reviews.splice(index, 1);
     localStorage.setItem("reviews", JSON.stringify(reviews));
     loadReviews();
+    loadUsers();
   }
 
   function handleEdit(e) {
@@ -363,6 +507,8 @@ document.addEventListener("DOMContentLoaded", () => {
   albumTracks = [];
   document.getElementById("track-list").innerHTML = "";
   loadReviews();
+  loadUsers();
+  updateProfileInfo();
 });
 
 
@@ -447,12 +593,5 @@ document.addEventListener("DOMContentLoaded", () => {
       console.error("Ошибка при получении альбомов:", error);
     }
   });
-
-  document.addEventListener("click", (e) => {
-    if (!albumInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
-      suggestionsBox.style.display = "none";
-    }
-  });
-
   loadReviews();
 });

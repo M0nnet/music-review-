@@ -13,32 +13,6 @@
     crossorigin="anonymous"
     referrerpolicy="no-referrer"
   />
-
-  <style>
-    .user-header {
-      position: absolute;
-      top: 10px;
-      right: 20px;
-      display: none;
-      align-items: center;
-      gap: 10px;
-      cursor: pointer;
-    }
-    .user-header .avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      object-fit: cover;
-    }
-    #profile-section {
-      display: none;
-      margin-top: 20px;
-      padding: 20px;
-      border: 1px solid #ccc;
-      background: #f9f9f9;
-      border-radius: 10px;
-    }
-  </style>
 </head>
 
 <body>
@@ -48,6 +22,48 @@
     <img id="user-avatar" class="avatar" src="" alt="Аватар" />
     <button id="logout-btn" class="logout-btn">
     <i class="fa-solid fa-right-from-bracket"></i>
+    </button>
+    <!-- 👤 Личный кабинет -->
+    <div id="profile-section">
+      <h2><i class="fa-solid fa-users"></i> Все пользователи</h2>
+<div id="users-list" class="user-list" style="margin-top: 20px;"></div>
+  <h2>Личный кабинет</h2>
+  <div id="profile">
+    <img id="user-avatar" src="" alt="Аватар" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 10px;">
+    <h3 id="user-name">Профиль</h3>
+
+    <div id="user-stats">
+      <p><strong>Отзывы:</strong> <span id="review-count">0</span></p>
+      <p><strong>Любимые треки:</strong> <span id="liked-tracks-count">0</span></p>
+    </div>
+
+    <div id="recent-reviews">
+      <h4>Последние отзывы</h4>
+      <ul id="recent-reviews-list"></ul>
+    </div>
+
+    <div id="favorite-tracks">
+      <h4>Любимые треки</h4>
+      <ul id="liked-tracks-list"></ul>
+    </div>
+
+    <hr style="margin: 20px 0;">
+
+    <label>
+      Имя:
+      <input type="text" id="display-name" placeholder="Ваше имя" />
+    </label>
+
+    <label>
+      Фото (выберите файл):
+      <input type="file" id="photo-file" accept="image/*" />
+    </label>
+    <img id="profile-photo-preview" src="" alt="Превью фото" style="width: 80px; height: 80px; display: none; border-radius: 50%; object-fit: cover; margin-bottom: 10px;" />
+
+    <button id="save-profile">Сохранить профиль</button>
+    <button id="close-profile">Закрыть</button>
+  </div>
+</div>
   </div>
 
   <!-- 🔐 Авторизация -->
@@ -71,6 +87,7 @@
 
   <!-- 📝 Основное содержимое -->
   <div class="container" id="main-content" style="display: none;">
+    <div id="public-profile" style="display: none; margin-top: 30px;"></div>
     <h1><i class="fa-solid fa-music"></i> Отзывы о музыке</h1>
 
     <form class="review-form">
@@ -116,26 +133,7 @@
     <h2><i class="fa-solid fa-clipboard-list"></i> Мои отзывы</h2>
     <div id="reviews-list"></div>
 
-    <!-- 👤 Личный кабинет -->
-    <div id="profile-section">
-      <h2>Личный кабинет</h2>
-      <img id="profile-photo-preview" src="" alt="Фото профиля" style="display: none; border-radius: 50%; width: 80px; margin-bottom: 10px;" />
-      <p><strong>Email:</strong> <span id="user-email"></span></p>
-
-      <label>
-        Имя:
-        <input type="text" id="display-name" placeholder="Ваше имя" />
-      </label>
-
-      <label>
-  Фото (выберите файл):
-  <input type="file" id="photo-file" accept="image/*" />
-</label>
-
-      <button id="save-profile">Сохранить профиль</button>
-      <button id="close-profile">Закрыть</button>
-    </div>
-  </div>
+    
 
   <!-- Firebase SDK -->
   <script type="module" src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"></script>
