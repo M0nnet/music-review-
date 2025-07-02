@@ -11,6 +11,7 @@ import {
   getFirestore,
   collection,
   addDoc,
+  serverTimestamp,
   getDocs,
   updateDoc,
   deleteDoc,
@@ -25,12 +26,11 @@ import {
   getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js";
 
-
 const firebaseConfig = {
   apiKey: "AIzaSyCnVoyXHd-3NQ4VcvjXdjncoyaTnqDjHVA",
   authDomain: "music-reviews-2fe39.firebaseapp.com",
   projectId: "music-reviews-2fe39",
-  storageBucket: "music-reviews-2fe39.firebasestorage.app",
+  storageBucket: "music-reviews-2fe39.appspot.com",
   messagingSenderId: "524571811015",
   appId: "1:524571811015:web:501fe3d7b447dc58abb2e2",
   measurementId: "G-MHKTNCJV3R"
@@ -115,36 +115,68 @@ if (logoutBtn) logoutBtn.onclick = async () => {
   }
 };
 
-onAuthStateChanged(auth, (user) => {
-  async function loadUsers() {
-  const usersContainer = document.getElementById("users-list"); // если хочешь отобразить где-то
+onAuthStateChanged(auth, async (user) => {
+ async function loadUsers() {
+  const usersContainer = document.getElementById("users-list");
   if (!usersContainer) return;
 
   try {
     const snapshot = await getDocs(collection(db, "users"));
     usersContainer.innerHTML = "";
-    snapshot.forEach(doc => {
-      const user = doc.data();
+
+    snapshot.docs.forEach(docSnap => {
+      const user = docSnap.data();
+      const uid = user.uid;
+
+      // Пропускаем текущего пользователя
+      if (uid === auth.currentUser.uid) return;
+
       const userDiv = document.createElement("div");
       userDiv.className = "user-card";
       userDiv.innerHTML = `
-        <img src="${user.photoURL || 'https://via.placeholder.com/40'}" style="width: 40px; border-radius: 50%;">
+        <img src="${user.photoURL || 'https://via.placeholder.com/40'}" style="width: 40px; border-radius: 50%; margin-right: 8px;">
         <span>${user.displayName || 'Без имени'}</span>
-        <button onclick="showUserProfile('${user.uid}', '${user.displayName || "Профиль"}', '${user.photoURL || ""}')">Посмотреть профиль</button>
+        <a href="?uid=${uid}" class="view-profile-link">Профиль</a>
+        <br>
+        <input type="text" class="message-input" placeholder="Введите сообщение..." style="margin-top: 5px; width: 70%;" data-uid="${uid}">
+        <button class="send-message-btn" data-uid="${uid}">📩</button>
       `;
       usersContainer.appendChild(userDiv);
+
+      const sendBtn = userDiv.querySelector(".send-message-btn");
+      const input = userDiv.querySelector(".message-input");
+
+      sendBtn.addEventListener("click", async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        await sendMessage(auth.currentUser.uid, uid, text);
+        input.value = "";
+        alert("Сообщение отправлено!");
+      });
     });
   } catch (error) {
     console.error("Ошибка при загрузке пользователей:", error);
   }
 }
+async function sendMessage(fromUid, toUid, text) {
+  await addDoc(collection(db, "messages"), {
+    from: fromUid,
+    to: toUid,
+    text: text,
+    timestamp: serverTimestamp()
+  });
+}
+
   async function syncUserProfile(user) {
-  if (!user) return;
+  if (!user || !user.uid) return;
+
   const userDocRef = doc(db, "users", user.uid);
+
   await setDoc(userDocRef, {
     uid: user.uid,
-    displayName: user.displayName || "Без имени",
-    photoURL: user.photoURL || "",
+    userId: user.uid,
+    name: user.displayName || "Anonymous",
+    photoURL: user.photoURL || null,
   }, { merge: true });
 }
   if (user) {
@@ -153,19 +185,28 @@ onAuthStateChanged(auth, (user) => {
     registerForm.style.display = "none";
     mainContent.style.display = "block";
 
+      const publicProfile = document.getElementById("public-profile");
+  publicProfile.style.display = "none";
+  
+
     userHeader.style.display = "flex";
     userNameDisplay.textContent = user.displayName || "Профиль";
     if (user.photoURL) {
       userAvatar.src = user.photoURL;
       userAvatar.style.display = "inline-block";
+       photoPreview.src = user.photoURL;
+    photoPreview.style.display = "block";
     }
 
     displayNameInput.value = user.displayName || "";
     
 
     loadReviews();
-    loadUsers();
     updateProfileInfo();
+    const currentSnap = await getDoc(doc(db, "users", user.uid));
+const currentUserData = currentSnap.exists() ? currentSnap.data() : null;
+loadUsers(currentUserData);
+
   } else {
     loginForm.style.display = "block";
     registerForm.style.display = "none";
@@ -246,6 +287,119 @@ async function showUserProfile(userId, userName, photoURL) {
   // Скрываем личный профиль и форму
   document.getElementById("profile-section").style.display = "none";
 }
+async function showFullPublicProfile(uid) {
+  const userDoc = await getDoc(doc(db, "users", uid));
+  if (!userDoc.exists()) {
+  await setDoc(doc(db, "users", uid), {
+    uid,
+    displayName: "Без имени",
+    photoURL: "",
+    friends: [],
+    friendRequestsSent: [],
+    friendRequestsReceived: []
+  });
+}
+
+  const user = userDoc.data();
+  document.getElementById("main-content").style.display = "block";
+  document.getElementById("profile-section").style.display = "none";
+  document.getElementById("public-profile").style.display = "block";
+
+  document.getElementById("public-name").textContent = user.displayName || "Без имени";
+  document.getElementById("public-photo").src = user.photoURL || "https://via.placeholder.com/80";
+
+  const openChatBtn = document.createElement("button");
+openChatBtn.textContent = "Открыть чат";
+openChatBtn.onclick = () => openChatWithUser(uid, user.displayName || "Пользователь");
+const nameContainer = document.getElementById("public-name");
+const chatBtn = document.createElement("button");
+chatBtn.textContent = "💬 Открыть чат";
+chatBtn.className = "chat-btn";
+chatBtn.onclick = () => openChatWithUser(uid, user.displayName || "Пользователь");
+nameContainer.parentElement.insertBefore(chatBtn, nameContainer.nextSibling);
+
+  const snapshot = await getDocs(collection(db, "reviews"));
+  const userReviews = snapshot.docs
+    .map(doc => doc.data())
+    .filter(r => r.userId === uid);
+
+  document.getElementById("public-review-count").textContent = userReviews.length;
+
+  const recentEl = document.getElementById("public-recent-reviews");
+  recentEl.innerHTML = userReviews.length > 0
+    ? userReviews.map(r => `<li>${r.title} (${r.year}) — ${r.rating}/10: ${r.comment}</li>`).join("")
+    : "<li>Нет отзывов</li>";
+
+  const likedTracks = new Set();
+  userReviews.forEach(r => (r.likedTracks || []).forEach(t => likedTracks.add(t)));
+
+  document.getElementById("public-liked-tracks-count").textContent = likedTracks.size;
+  const likedList = document.getElementById("public-liked-tracks-list");
+  likedList.innerHTML = likedTracks.size > 0
+    ? [...likedTracks].map(t => `<li>${t}</li>`).join("")
+    : "<li>Нет любимых треков</li>";
+}
+
+let currentChatUid = null;
+
+window.openChatWithUser = async (uid, name) => {
+  currentChatUid = uid;
+  document.getElementById("chat-title").textContent = `Чат с ${name}`;
+  document.getElementById("chat-window").style.display = "block";
+  profileSection.style.display = "none";
+  await loadMessagesWith(uid);
+};
+
+async function loadMessagesWith(uid) {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const q = collection(db, "messages");
+  const snapshot = await getDocs(q);
+
+  const messages = snapshot.docs
+    .map(doc => doc.data())
+    .filter(m =>
+      (m.from === user.uid && m.to === uid) ||
+      (m.from === uid && m.to === user.uid)
+    )
+    .sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+
+  const messagesContainer = document.getElementById("chat-messages");
+  messagesContainer.innerHTML = "";
+
+  messages.forEach(m => {
+    const msgDiv = document.createElement("div");
+    msgDiv.className = "message " + (m.from === user.uid ? "sent" : "received");
+    const time = m.timestamp?.toDate?.().toLocaleTimeString?.("ru-RU", { hour: "2-digit", minute: "2-digit" }) || "";
+    msgDiv.textContent = `[${time}] ${m.text}`;
+    messagesContainer.appendChild(msgDiv);
+  });
+
+  messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+document.getElementById("send-chat").addEventListener("click", async () => {
+  const user = auth.currentUser;
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text || !currentChatUid || !user) return;
+
+  await addDoc(collection(db, "messages"), {
+    from: auth.currentUser.uid,
+    to: currentChatUid, 
+    text: text, 
+    timestamp: serverTimestamp()
+  });
+
+  input.value = "";
+  await loadMessagesWith(currentChatUid);
+});
+document.getElementById("close-chat").addEventListener("click", () => {
+  document.getElementById("chat-window").style.display = "none";
+  profileSection.style.display = "block";
+});
+
+
 
 let albumTracks = [];
 function loadReviews() {
@@ -594,4 +748,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
   loadReviews();
+  const params = new URLSearchParams(window.location.search);
+const uidFromUrl = params.get("uid");
+if (uidFromUrl) {
+  showFullPublicProfile(uidFromUrl);
+  history.replaceState(null, "", window.location.pathname);
+}
 });
